@@ -27,3 +27,13 @@ target/
 # OS files
 .DS_Store
 Thumbs.db
+
+# H2 database files
+*.mv.db
+*.trace.db
+
+# Eclipse / Spring Tools
+.classpath
+.factorypath
+.project
+.settings/
