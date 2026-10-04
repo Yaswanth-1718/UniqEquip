@@ -12,6 +12,7 @@ import BookingStatusTracker from './components/BookingStatusTracker';
 import AdminApprovalPortal from './components/AdminApprovalPortal';
 import AnalyticsReports from './components/AnalyticsReports';
 import BookingFormModal from './components/BookingFormModal';
+import DatabaseManager from './components/DatabaseManager';
 
 function MainAppContent() {
   const { currentUser } = useAuth();
@@ -33,7 +34,7 @@ function MainAppContent() {
   // Enforce Dashboard is strictly restricted to ADMIN only
   useEffect(() => {
     if (currentUser) {
-      if (currentUser.role !== 'ADMIN' && activeTab === 'dashboard') {
+      if (currentUser.role !== 'ADMIN' && (activeTab === 'dashboard' || activeTab === 'database')) {
         setActiveTab(currentUser.role === 'FACULTY' ? 'approval' : 'catalog');
       }
     }
@@ -178,6 +179,10 @@ function MainAppContent() {
               bookings={bookings}
               equipment={equipment}
             />
+          )}
+
+          {activeTab === 'database' && currentUser?.role === 'ADMIN' && (
+            <DatabaseManager />
           )}
         </main>
 

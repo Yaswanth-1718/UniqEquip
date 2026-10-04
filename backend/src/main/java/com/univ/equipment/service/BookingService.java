@@ -3,6 +3,8 @@ package com.univ.equipment.service;
 import com.univ.equipment.model.*;
 import com.univ.equipment.repository.BookingRequestRepository;
 import com.univ.equipment.repository.EquipmentRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -13,12 +15,18 @@ import java.util.Optional;
 @Service
 public class BookingService {
 
+    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
+
     private final BookingRequestRepository bookingRepository;
     private final EquipmentRepository equipmentRepository;
+    private final EmailNotificationService emailNotificationService;
 
-    public BookingService(BookingRequestRepository bookingRepository, EquipmentRepository equipmentRepository) {
+    public BookingService(BookingRequestRepository bookingRepository,
+                          EquipmentRepository equipmentRepository,
+                          EmailNotificationService emailNotificationService) {
         this.bookingRepository = bookingRepository;
         this.equipmentRepository = equipmentRepository;
+        this.emailNotificationService = emailNotificationService;
     }
 
     public List<BookingRequest> getAllBookings() {
@@ -47,7 +55,16 @@ public class BookingService {
         if (request.getStatus() == null) {
             request.setStatus(BookingStatus.PENDING_FACULTY);
         }
-        return bookingRepository.save(request);
+        BookingRequest saved = bookingRepository.save(request);
+        // Email must never break booking creation: the notification service
+        // runs in its own transaction and swallows its own failures.
+        try {
+            emailNotificationService.onBookingCreated(saved);
+        } catch (Exception e) {
+            log.error("Post-booking notification hook failed for booking {}: {}",
+                    saved.getId(), e.getMessage());
+        }
+        return saved;
     }
 
     @Transactional
@@ -61,7 +78,16 @@ public class BookingService {
         } else {
             request.setStatus(BookingStatus.REJECTED);
         }
-        return bookingRepository.save(request);
+        BookingRequest saved = bookingRepository.save(request);
+        if (!endorse) {
+            try {
+                emailNotificationService.onBookingRejected(saved, notes);
+            } catch (Exception e) {
+                log.error("Rejection notification hook failed for booking {}: {}",
+                        saved.getId(), e.getMessage());
+            }
+        }
+        return saved;
     }
 
     @Transactional
@@ -75,7 +101,18 @@ public class BookingService {
         } else {
             request.setStatus(BookingStatus.REJECTED);
         }
-        return bookingRepository.save(request);
+        BookingRequest saved = bookingRepository.save(request);
+        try {
+            if (approve) {
+                emailNotificationService.onBookingApproved(saved);
+            } else {
+                emailNotificationService.onBookingRejected(saved, notes);
+            }
+        } catch (Exception e) {
+            log.error("Approval notification hook failed for booking {}: {}",
+                    saved.getId(), e.getMessage());
+        }
+        return saved;
     }
 
     @Transactional
@@ -101,7 +138,14 @@ public class BookingService {
         }
 
         request.setStatus(BookingStatus.ISSUED);
-        return bookingRepository.save(request);
+        BookingRequest saved = bookingRepository.save(request);
+        try {
+            emailNotificationService.onEquipmentIssued(saved);
+        } catch (Exception e) {
+            log.error("Issue notification hook failed for booking {}: {}",
+                    saved.getId(), e.getMessage());
+        }
+        return saved;
     }
 
     @Transactional
@@ -127,6 +171,13 @@ public class BookingService {
         }
 
         request.setStatus(BookingStatus.RETURNED);
-        return bookingRepository.save(request);
+        BookingRequest saved = bookingRepository.save(request);
+        try {
+            emailNotificationService.onEquipmentReturned(saved.getId());
+        } catch (Exception e) {
+            log.error("Return notification hook failed for booking {}: {}",
+                    saved.getId(), e.getMessage());
+        }
+        return saved;
     }
 }

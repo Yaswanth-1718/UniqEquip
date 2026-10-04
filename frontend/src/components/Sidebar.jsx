@@ -1,12 +1,13 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  LayoutDashboard, 
-  PackageSearch, 
-  Sparkles, 
-  ClipboardCheck, 
+import {
+  LayoutDashboard,
+  PackageSearch,
+  Sparkles,
+  ClipboardCheck,
   BarChart3,
   CalendarCheck2,
+  Database,
   X,
   LogOut
 } from 'lucide-react';
@@ -33,6 +34,7 @@ export default function Sidebar({ activeTab, setActiveTab, pendingCount, isMobil
 
   if (currentUser?.role === 'ADMIN') {
     navItems.push({ id: 'analytics', label: 'Analytics', icon: BarChart3 });
+    navItems.push({ id: 'database', label: 'Database Manager', icon: Database });
   }
 
   const handleSelectTab = (id) => {

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/client';
 import { 
   CheckCircle, 
   Clock, 
@@ -68,7 +69,6 @@ export default function BookingStatusTracker({ bookings }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      
       <div className="glass-panel" style={{ padding: 24 }}>
         <h3 style={{ fontSize: '1.2rem', fontWeight: 800, marginBottom: 4 }}>Reservation Approval & Status Tracker</h3>
         <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
@@ -173,6 +173,9 @@ export default function BookingStatusTracker({ bookings }) {
                       </div>
                     )}
 
+                    {/* Email Notifications (from email_notifications table) */}
+                    <BookingNotifications bookingId={b.id} />
+
                   </div>
                 )}
 
@@ -182,6 +185,56 @@ export default function BookingStatusTracker({ bookings }) {
         </div>
       )}
 
+    </div>
+  );
+}
+
+const NOTIF_LABEL = {
+  BOOKING_CONFIRMATION: 'Booking confirmation',
+  BOOKING_APPROVED: 'Booking approved',
+  BOOKING_REJECTED: 'Booking rejected',
+  START_REMINDER: 'Start reminder',
+  RETURN_REMINDER: 'Return reminder'
+};
+
+function BookingNotifications({ bookingId }) {
+  const [items, setItems] = useState(null);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    api.getBookingNotifications(bookingId).then(data => {
+      if (!cancelled) setItems(Array.isArray(data) ? data : []);
+    });
+    return () => { cancelled = true; };
+  }, [bookingId]);
+
+  if (!items || items.length === 0) return null;
+
+  const fmtTime = (v) => {
+    try {
+      return new Date(v).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch (e) {
+      return v;
+    }
+  };
+
+  return (
+    <div style={{ background: 'rgba(226,185,74,0.05)', padding: 12, borderRadius: 6, fontSize: '0.82rem' }}>
+      <h5 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#e2b94a', marginBottom: 8 }}>Notifications</h5>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        {items.map(n => (
+          <div key={n.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: n.status === 'SENT' ? '#34d399' : (n.status === 'FAILED' ? '#fb7185' : '#fbbf24') }}>
+              {n.status === 'SENT' ? '✓' : '○'}
+            </span>
+            <span>
+              {NOTIF_LABEL[n.type] || n.type} {n.status === 'SENT' ? 'sent' : n.status.toLowerCase()}
+              {n.status === 'SENT' && n.sentAt ? ` at ${fmtTime(n.sentAt)}` : ''}
+              {(n.status === 'PENDING' || n.status === 'FAILED') && n.scheduledFor ? ` — scheduled for ${fmtTime(n.scheduledFor)}` : ''}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

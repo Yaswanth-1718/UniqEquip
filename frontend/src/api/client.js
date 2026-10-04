@@ -767,5 +767,13 @@ export const api = {
     }
 
     return alternatives;
+  },
+
+  async getBookingNotifications(bookingId) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/notifications`);
+      if (res.ok) return await res.json();
+    } catch (e) {}
+    return [];
   }
 };
