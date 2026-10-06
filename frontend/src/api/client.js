@@ -293,6 +293,46 @@ function setStored(key, val) {
   } catch (e) {}
 }
 
+// Offline fallback used ONLY when the backend cannot be reached at all.
+// When the backend responds (even with an error), its answer is authoritative
+// so that H2 remains the source of truth for users.
+function registerUserLocal(userData) {
+  let users = getStored('ueb_users', DEFAULT_DATA.users);
+
+  if (users.find(u => u.email === userData.email)) {
+    throw new Error('Email already registered');
+  }
+
+  let accountStatus = userData.role === 'ADMIN' ? 'APPROVED' : 'PENDING';
+
+  const newUser = {
+    ...userData,
+    id: Date.now(),
+    status: accountStatus,
+    avatar: userData.role === 'STUDENT' ? '🎓' : userData.role === 'CLUB_LEAD' ? '🚀' : userData.role === 'FACULTY' ? '👨‍🏫' : '🛡️',
+    roleLabel: userData.role === 'STUDENT' ? 'Student' : userData.role === 'CLUB_LEAD' ? 'Club Leader' : userData.role === 'FACULTY' ? 'Faculty Supervisor' : 'System Admin'
+  };
+
+  users.push(newUser);
+  setStored('ueb_users', users);
+  return newUser;
+}
+
+function loginLocal(email, password, role) {
+  let users = getStored('ueb_users', DEFAULT_DATA.users);
+  const user = users.find(u => u.email === email && u.password === password && u.role === role);
+
+  if (!user) {
+    throw new Error('Invalid email, password, or role combination.');
+  }
+
+  if (user.status !== 'APPROVED') {
+    throw new Error('Your account is pending Admin approval.');
+  }
+
+  return user;
+}
+
 export const api = {
   // Equipment APIs
   async getEquipment(category = null, search = '') {
@@ -580,80 +620,59 @@ export const api = {
 
   // Auth & User Management APIs
   async registerUser(userData) {
+    let res;
     try {
-      const res = await fetch(`${API_BASE_URL}/users/register`, {
+      res = await fetch(`${API_BASE_URL}/users/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userData)
       });
-
-      if (res.ok) {
-        let user = await res.json();
-        return {
-          ...user,
-          avatar: user.role === 'STUDENT' ? '🎓' : user.role === 'CLUB_LEAD' ? '🚀' : user.role === 'FACULTY' ? '👨‍🏫' : '🛡️',
-          roleLabel: user.role === 'STUDENT' ? 'Student' : user.role === 'CLUB_LEAD' ? 'Club Leader' : user.role === 'FACULTY' ? 'Faculty Supervisor' : 'System Admin'
-        };
-      }
-
-      const errorBody = await res.json().catch(() => ({}));
-      throw new Error(errorBody.message || 'Registration failed');
-    } catch (e) {
-      let users = getStored('ueb_users', DEFAULT_DATA.users);
-
-      if (users.find(u => u.email === userData.email)) {
-        throw new Error('Email already registered');
-      }
-
-      let accountStatus = userData.role === 'ADMIN' ? 'APPROVED' : 'PENDING';
-
-      const newUser = {
-        ...userData,
-        id: Date.now(),
-        status: accountStatus,
-        avatar: userData.role === 'STUDENT' ? '🎓' : userData.role === 'CLUB_LEAD' ? '🚀' : userData.role === 'FACULTY' ? '👨‍🏫' : '🛡️',
-        roleLabel: userData.role === 'STUDENT' ? 'Student' : userData.role === 'CLUB_LEAD' ? 'Club Leader' : userData.role === 'FACULTY' ? 'Faculty Supervisor' : 'System Admin'
-      };
-
-      users.push(newUser);
-      setStored('ueb_users', users);
-      return newUser;
+    } catch (networkError) {
+      // Backend unreachable (down / cold start): local fallback only in this case.
+      return registerUserLocal(userData);
     }
+
+    if (res.ok) {
+      let user = await res.json();
+      return {
+        ...user,
+        avatar: user.role === 'STUDENT' ? '🎓' : user.role === 'CLUB_LEAD' ? '🚀' : user.role === 'FACULTY' ? '👨‍🏫' : '🛡️',
+        roleLabel: user.role === 'STUDENT' ? 'Student' : user.role === 'CLUB_LEAD' ? 'Club Leader' : user.role === 'FACULTY' ? 'Faculty Supervisor' : 'System Admin'
+      };
+    }
+
+    // Backend responded with an error: surface it instead of silently
+    // storing the user only in localStorage (H2 stays the source of truth).
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.message || 'Registration failed');
   },
 
   async login(email, password, role) {
+    let res;
     try {
-      const res = await fetch(`${API_BASE_URL}/users/login`, {
+      res = await fetch(`${API_BASE_URL}/users/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, role })
       });
-
-      if (res.ok) {
-        let user = await res.json();
-        return {
-          ...user,
-          avatar: user.role === 'STUDENT' ? '🎓' : user.role === 'CLUB_LEAD' ? '🚀' : user.role === 'FACULTY' ? '👨‍🏫' : '🛡️',
-          roleLabel: user.role === 'STUDENT' ? 'Student' : user.role === 'CLUB_LEAD' ? 'Club Leader' : user.role === 'FACULTY' ? 'Faculty Supervisor' : 'System Admin'
-        };
-      }
-
-      const errorBody = await res.json().catch(() => ({}));
-      throw new Error(errorBody.message || 'Invalid email, password, or role combination.');
-    } catch (e) {
-      let users = getStored('ueb_users', DEFAULT_DATA.users);
-      const user = users.find(u => u.email === email && u.password === password && u.role === role);
-
-      if (!user) {
-        throw new Error('Invalid email, password, or role combination.');
-      }
-
-      if (user.status !== 'APPROVED') {
-        throw new Error('Your account is pending Admin approval.');
-      }
-
-      return user;
+    } catch (networkError) {
+      // Backend unreachable (down / cold start): local fallback only in this case.
+      return loginLocal(email, password, role);
     }
+
+    if (res.ok) {
+      let user = await res.json();
+      return {
+        ...user,
+        avatar: user.role === 'STUDENT' ? '🎓' : user.role === 'CLUB_LEAD' ? '🚀' : user.role === 'FACULTY' ? '👨‍🏫' : '🛡️',
+        roleLabel: user.role === 'STUDENT' ? 'Student' : user.role === 'CLUB_LEAD' ? 'Club Leader' : user.role === 'FACULTY' ? 'Faculty Supervisor' : 'System Admin'
+      };
+    }
+
+    // Backend rejected the credentials: surface the error instead of
+    // silently falling back to a possibly stale localStorage copy.
+    const errorBody = await res.json().catch(() => ({}));
+    throw new Error(errorBody.message || 'Invalid email, password, or role combination.');
   },
 
   async getPendingUsers() {
