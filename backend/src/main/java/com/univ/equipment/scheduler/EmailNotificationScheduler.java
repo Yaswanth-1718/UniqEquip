@@ -3,6 +3,7 @@ package com.univ.equipment.scheduler;
 import com.univ.equipment.service.EmailNotificationService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +21,7 @@ import java.util.List;
  * endpoint; see README.
  */
 @Component
+@ConditionalOnProperty(name = "n8n.enabled", havingValue = "false", matchIfMissing = true)
 public class EmailNotificationScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(EmailNotificationScheduler.class);

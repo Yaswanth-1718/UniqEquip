@@ -28,6 +28,7 @@ export default function EmailNotificationsView() {
   const [bookingFilter, setBookingFilter] = useState('');
   const [page, setPage] = useState(0);
   const [mailConfigured, setMailConfigured] = useState(null);
+  const [mailProvider, setMailProvider] = useState('smtp');
   const [testModal, setTestModal] = useState(false);
   const [testRecipient, setTestRecipient] = useState('');
   const [testSubject, setTestSubject] = useState('');
@@ -51,6 +52,7 @@ export default function EmailNotificationsView() {
     try {
       const s = await adminApi.getMailStatus();
       setMailConfigured(!!s.configured);
+      setMailProvider(s.provider || 'smtp');
     } catch (e) {
       setMailConfigured(false);
     }
@@ -124,7 +126,7 @@ export default function EmailNotificationsView() {
         <div>
           <h3 style={{ fontSize: '1.2rem', fontWeight: 800 }}>email_notifications</h3>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>
-            {filtered.length} record{filtered.length === 1 ? '' : 's'} • SMTP: {mailConfigured === null ? '…' : (mailConfigured ? 'configured' : 'NOT configured')}
+            {filtered.length} record{filtered.length === 1 ? '' : 's'} • {mailProvider === 'n8n' ? 'Delivery provider: n8n' : `SMTP: ${mailConfigured === null ? '…' : (mailConfigured ? 'configured' : 'NOT configured')}`}
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -135,7 +137,9 @@ export default function EmailNotificationsView() {
 
       {mailConfigured === false && (
         <div style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.4)', color: '#fbbf24', padding: '10px 14px', borderRadius: 8, fontSize: '0.85rem' }}>
-          MAIL_USERNAME / MAIL_PASSWORD are not set. Notifications will be recorded as FAILED and retried later — bookings are unaffected. See README for Gmail App Password setup.
+          {mailProvider === 'n8n'
+            ? 'n8n delivery is active but N8N_WEBHOOK_URL / N8N_WEBHOOK_SECRET are missing. Booking events cannot reach n8n — bookings themselves are unaffected. See README for Render configuration.'
+            : 'MAIL_USERNAME / MAIL_PASSWORD are not set. Notifications will be recorded as FAILED and retried later — bookings are unaffected. See README for Gmail App Password setup.'}
         </div>
       )}
 

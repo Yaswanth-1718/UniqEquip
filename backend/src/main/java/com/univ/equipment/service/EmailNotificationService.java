@@ -11,6 +11,7 @@ import com.univ.equipment.repository.EmailNotificationRepository;
 import com.univ.equipment.repository.UserRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,6 +41,10 @@ public class EmailNotificationService {
     private final UserRepository userRepository;
     private final EmailService emailService;
 
+    /** When true, n8n owns delivery and this local flow stays dormant. */
+    @Value("${n8n.enabled:false}")
+    private boolean n8nEnabled;
+
     public EmailNotificationService(EmailNotificationRepository notificationRepository,
                                     BookingRequestRepository bookingRepository,
                                     UserRepository userRepository,
@@ -57,6 +62,9 @@ public class EmailNotificationService {
     /** Booking just created: confirmation (sent now) + future reminders. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBookingCreated(BookingRequest booking) {
+        if (n8nEnabled) {
+            return; // n8n owns delivery; avoid duplicate local emails.
+        }
         try {
             Recipient recipient = resolveRecipient(booking);
             createAndSend(booking.getId(), EmailNotificationType.BOOKING_CONFIRMATION,
@@ -83,6 +91,9 @@ public class EmailNotificationService {
     /** Admin approved: queue/send BOOKING_APPROVED. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBookingApproved(BookingRequest booking) {
+        if (n8nEnabled) {
+            return; // n8n owns delivery; avoid duplicate local emails.
+        }
         try {
             Recipient recipient = resolveRecipient(booking);
             createAndSend(booking.getId(), EmailNotificationType.BOOKING_APPROVED,
@@ -95,6 +106,9 @@ public class EmailNotificationService {
     /** Faculty/admin rejected: send BOOKING_REJECTED, cancel future reminders. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onBookingRejected(BookingRequest booking, String notes) {
+        if (n8nEnabled) {
+            return; // n8n owns delivery; avoid duplicate local emails.
+        }
         try {
             Recipient recipient = resolveRecipient(booking);
             EmailNotification n = createPending(booking.getId(), EmailNotificationType.BOOKING_REJECTED,
@@ -111,6 +125,9 @@ public class EmailNotificationService {
     /** Equipment issued: make sure a return reminder exists. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onEquipmentIssued(BookingRequest booking) {
+        if (n8nEnabled) {
+            return; // n8n owns delivery; avoid duplicate local emails.
+        }
         try {
             if (booking.getEndDate() == null) {
                 return;
@@ -134,6 +151,9 @@ public class EmailNotificationService {
     /** Equipment returned early: cancel the pending return reminder. */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void onEquipmentReturned(Long bookingId) {
+        if (n8nEnabled) {
+            return; // n8n owns delivery; avoid duplicate local emails.
+        }
         try {
             cancelOne(bookingId, EmailNotificationType.RETURN_REMINDER);
         } catch (Exception e) {
@@ -195,6 +215,9 @@ public class EmailNotificationService {
     /** Admin manual retry of a FAILED notification (sends immediately). */
     @Transactional
     public EmailNotification retry(Long notificationId) {
+        if (n8nEnabled) {
+            throw new RuntimeException("Local retry is disabled while n8n mode is active.");
+        }
         EmailNotification n = notificationRepository.findById(notificationId)
                 .orElseThrow(() -> new RuntimeException("Notification not found: " + notificationId));
         if (n.getStatus() == EmailNotificationStatus.SENT) {

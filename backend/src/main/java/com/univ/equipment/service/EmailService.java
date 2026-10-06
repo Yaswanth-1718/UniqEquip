@@ -40,12 +40,19 @@ public class EmailService {
     @Value("${app.timezone:Asia/Kolkata}")
     private String timezoneId;
 
+    @Value("${n8n.enabled:false}")
+    private boolean n8nEnabled;
+
     public EmailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
     }
 
     @PostConstruct
     public void checkConfiguration() {
+        if (n8nEnabled) {
+            log.info("n8n mode is active: booking emails are delivered by n8n, local SMTP flow is dormant.");
+            return;
+        }
         if (!isMailConfigured()) {
             log.warn("MAIL_USERNAME / MAIL_PASSWORD are not set. Booking emails will be recorded as FAILED "
                     + "and retried later; bookings themselves are unaffected. "

@@ -40,6 +40,27 @@ Copy `.env.example` to `.env` for local use. **Never commit `.env` or any real c
 
 Without `MAIL_USERNAME`/`MAIL_PASSWORD` the app still starts and bookings work normally; emails are recorded as `FAILED` in `email_notifications` and can be retried later from Admin → Database Manager → Email Notifications.
 
+## n8n delivery (production)
+
+Production email delivery and reminder scheduling are handled by n8n, not by Gmail SMTP from this app:
+
+```text
+React → Spring Boot → n8n webhook → Wait / status checks → Gmail node → user email
+```
+
+Spring Boot only POSTs booking lifecycle events to the n8n webhook; the frontend never talks to n8n. Events: `BOOKING_CREATED`, `BOOKING_APPROVED`, `BOOKING_REJECTED` (with `reviewerNotes`), `EQUIPMENT_RETURNED`, `TEST_EMAIL`. Dates are sent as ISO-8601 with offset (e.g. `2026-10-08T15:00:00+05:30`) in `APP_TIMEZONE`. Every webhook call carries the `X-UNIEQUIP-SECRET` header; the secret is never logged, never sent to the browser, and never committed.
+
+Render environment variables:
+
+```text
+N8N_ENABLED=true
+N8N_WEBHOOK_URL=https://n8n-latest-f5hv.onrender.com/webhook/uniequip-booking-event
+N8N_WEBHOOK_SECRET=<same secret configured in the n8n Normalize & Verify node>
+APP_TIMEZONE=Asia/Kolkata
+```
+
+`MAIL_USERNAME` / `MAIL_PASSWORD` are **not required** when n8n mode is enabled. When `N8N_ENABLED=true`, the local `JavaMailSender` flow and the local `EmailNotificationScheduler` are dormant (the scheduler bean is not even created), so no duplicate emails are possible; the `email_notifications` table is kept for history. With `N8N_ENABLED=false` (default, local dev) the original local system works as before. A webhook failure never fails the booking — it is only logged.
+
 ## Gmail SMTP setup (App Password)
 
 1. Create or choose a Gmail account for notifications (e.g. `uniequip.notifications@gmail.com`).
