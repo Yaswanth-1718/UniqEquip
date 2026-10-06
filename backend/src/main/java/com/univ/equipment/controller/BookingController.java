@@ -2,13 +2,10 @@ package com.univ.equipment.controller;
 
 import com.univ.equipment.model.BookingRequest;
 import com.univ.equipment.model.BookingStatus;
-import com.univ.equipment.model.EmailNotification;
 import com.univ.equipment.service.BookingService;
-import com.univ.equipment.service.EmailNotificationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -18,11 +15,9 @@ import java.util.Map;
 public class BookingController {
 
     private final BookingService bookingService;
-    private final EmailNotificationService notificationService;
 
-    public BookingController(BookingService bookingService, EmailNotificationService notificationService) {
+    public BookingController(BookingService bookingService) {
         this.bookingService = bookingService;
-        this.notificationService = notificationService;
     }
 
     @GetMapping
@@ -80,31 +75,5 @@ public class BookingController {
     @PostMapping("/{id}/return")
     public ResponseEntity<BookingRequest> returnEquipment(@PathVariable Long id) {
         return ResponseEntity.ok(bookingService.returnEquipment(id));
-    }
-
-    /**
-     * Sanitized notification feed for a booking (type / status / schedule only,
-     * no email addresses), shown in the booking details UI.
-     */
-    @GetMapping("/{id}/notifications")
-    public ResponseEntity<List<Map<String, Object>>> getBookingNotifications(@PathVariable Long id) {
-        if (bookingService.getBookingById(id).isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
-        List<Map<String, Object>> feed = notificationService.findByBookingId(id).stream()
-                .map(this::sanitizeNotification)
-                .toList();
-        return ResponseEntity.ok(feed);
-    }
-
-    private Map<String, Object> sanitizeNotification(EmailNotification n) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("id", n.getId());
-        m.put("type", n.getType());
-        m.put("status", n.getStatus());
-        m.put("scheduledFor", n.getScheduledFor());
-        m.put("sentAt", n.getSentAt());
-        m.put("attemptCount", n.getAttemptCount());
-        return m;
     }
 }

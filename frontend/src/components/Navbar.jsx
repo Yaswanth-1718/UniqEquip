@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { GraduationCap, Sparkles, PlusCircle, LogOut, Menu, X, Moon, Sun } from 'lucide-react';
+import NotificationBell from './NotificationBell';
 
-export default function Navbar({ onOpenNewBooking, onOpenRecommendation, isMobileMenuOpen, setIsMobileMenuOpen }) {
+export default function Navbar({ onOpenNewBooking, onOpenRecommendation, isMobileMenuOpen, setIsMobileMenuOpen, onNavigate }) {
   const { currentUser, logout } = useAuth();
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [theme, setTheme] = useState(localStorage.getItem('theme') || 'dark');
@@ -73,6 +74,8 @@ export default function Navbar({ onOpenNewBooking, onOpenRecommendation, isMobil
             <PlusCircle size={15} />
             <span className="hide-on-mobile">Book Gear</span>
           </button>
+
+          <NotificationBell userId={currentUser?.id} onNavigate={onNavigate} />
 
           {/* User Profile Dropdown */}
           <div style={{ position: 'relative' }}>

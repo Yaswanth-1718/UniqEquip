@@ -97,6 +97,28 @@ export const DB_TABLES = {
       { key: 'recommendedItemsJson', label: 'Items JSON', type: 'json', hideInTable: true },
       { key: 'explanation', label: 'Explanation', type: 'textarea', hideInTable: true }
     ]
+  },
+  'user-notifications': {
+    endpoint: 'user-notifications',
+    searchPlaceholder: 'Search notifications by title, message, type...',
+    canCreate: false,
+    canUpdate: false,
+    canDelete: true,
+    deleteConfirm: 'Delete this notification? The user will no longer see it.',
+    columns: [
+      { key: 'id', label: 'ID', width: 60 },
+      { key: 'userId', label: 'User ID' },
+      { key: 'bookingId', label: 'Booking #' },
+      { key: 'type', label: 'Type' },
+      { key: 'priority', label: 'Priority' },
+      { key: 'title', label: 'Title' },
+      { key: 'message', label: 'Message', hideInTable: true },
+      { key: 'read', label: 'Read' },
+      { key: 'scheduledFor', label: 'Scheduled', type: 'datetime' },
+      { key: 'deliveredAt', label: 'Delivered', type: 'datetime' },
+      { key: 'createdAt', label: 'Created', type: 'datetime', hideInTable: true },
+      { key: 'actionUrl', label: 'Action', hideInTable: true }
+    ]
   }
 };
 
@@ -124,6 +146,13 @@ export function formatCellValue(col, record) {
   }
   if (col.key === 'role' || col.key === 'requesterRole') {
     return <span className="badge badge-secondary">{String(v)}</span>;
+  }
+  if (col.key === 'read') {
+    return <span className={`badge ${v ? 'badge-returned' : 'badge-pending'}`}>{v ? 'Read' : 'Unread'}</span>;
+  }
+  if (col.key === 'priority') {
+    const cls = v === 'SUCCESS' ? 'badge-issued' : v === 'ERROR' ? 'badge-rejected' : v === 'WARNING' ? 'badge-pending' : 'badge-secondary';
+    return <span className={`badge ${cls}`}>{String(v)}</span>;
   }
   return String(v);
 }

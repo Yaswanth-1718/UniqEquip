@@ -1,0 +1,12 @@
+package com.univ.equipment.model;
+
+public enum NotificationType {
+    BOOKING_CREATED,
+    BOOKING_FACULTY_APPROVED,
+    BOOKING_APPROVED,
+    BOOKING_REJECTED,
+    EQUIPMENT_ISSUED,
+    START_REMINDER,
+    RETURN_REMINDER,
+    EQUIPMENT_RETURNED
+}

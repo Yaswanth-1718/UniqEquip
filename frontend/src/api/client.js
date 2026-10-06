@@ -769,11 +769,34 @@ export const api = {
     return alternatives;
   },
 
-  async getBookingNotifications(bookingId) {
+  async getNotifications(userId) {
     try {
-      const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/notifications`);
+      const res = await fetch(`${API_BASE_URL}/notifications?userId=${userId}`);
       if (res.ok) return await res.json();
     } catch (e) {}
     return [];
+  },
+
+  async getUnreadNotificationCount(userId) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/notifications/unread-count?userId=${userId}`);
+      if (res.ok) {
+        const body = await res.json();
+        return body.count || 0;
+      }
+    } catch (e) {}
+    return 0;
+  },
+
+  async markNotificationRead(id, userId) {
+    const res = await fetch(`${API_BASE_URL}/notifications/${id}/read?userId=${userId}`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to mark notification as read');
+    return res.json().catch(() => ({}));
+  },
+
+  async markAllNotificationsRead(userId) {
+    const res = await fetch(`${API_BASE_URL}/notifications/read-all?userId=${userId}`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to mark all notifications as read');
+    return res.json().catch(() => ({}));
   }
 };

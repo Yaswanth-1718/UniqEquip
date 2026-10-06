@@ -3,18 +3,17 @@ package com.univ.equipment.controller;
 import com.univ.equipment.model.BookingItem;
 import com.univ.equipment.model.BookingRequest;
 import com.univ.equipment.model.BookingStatus;
-import com.univ.equipment.model.EmailNotification;
 import com.univ.equipment.model.Equipment;
 import com.univ.equipment.model.EquipmentCategory;
 import com.univ.equipment.model.EquipmentStatus;
 import com.univ.equipment.model.RecommendationRule;
 import com.univ.equipment.model.Role;
 import com.univ.equipment.model.User;
+import com.univ.equipment.model.UserNotification;
 import com.univ.equipment.repository.BookingRequestRepository;
-import com.univ.equipment.repository.EmailNotificationRepository;
 import com.univ.equipment.repository.RecommendationRuleRepository;
+import com.univ.equipment.repository.UserNotificationRepository;
 import com.univ.equipment.repository.UserRepository;
-import com.univ.equipment.service.EmailNotificationService;
 import com.univ.equipment.service.EquipmentService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -42,21 +41,18 @@ public class AdminDatabaseController {
     private final EquipmentService equipmentService;
     private final BookingRequestRepository bookingRepository;
     private final RecommendationRuleRepository ruleRepository;
-    private final EmailNotificationRepository notificationRepository;
-    private final EmailNotificationService notificationService;
+    private final UserNotificationRepository notificationRepository;
 
     public AdminDatabaseController(UserRepository userRepository,
                                    EquipmentService equipmentService,
                                    BookingRequestRepository bookingRepository,
                                    RecommendationRuleRepository ruleRepository,
-                                   EmailNotificationRepository notificationRepository,
-                                   EmailNotificationService notificationService) {
+                                   UserNotificationRepository notificationRepository) {
         this.userRepository = userRepository;
         this.equipmentService = equipmentService;
         this.bookingRepository = bookingRepository;
         this.ruleRepository = ruleRepository;
         this.notificationRepository = notificationRepository;
-        this.notificationService = notificationService;
     }
 
     private void requireAdmin(String role) {
@@ -76,7 +72,7 @@ public class AdminDatabaseController {
         tables.add(card("bookings", "Bookings", "booking_requests", bookingRepository.count()));
         tables.add(card("booking-items", "Booking Items", "booking_items", countBookingItems()));
         tables.add(card("recommendation-rules", "Recommendation Rules", "recommendation_rules", ruleRepository.count()));
-        tables.add(card("email-notifications", "Email Notifications", "email_notifications", notificationRepository.count()));
+        tables.add(card("user-notifications", "User Notifications", "user_notifications", notificationRepository.count()));
         return ResponseEntity.ok(Map.of("tables", tables));
     }
 
@@ -251,7 +247,7 @@ public class AdminDatabaseController {
         BookingRequest booking = bookingRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Booking not found: " + id));
         // Booking items cascade via orphanRemoval; notifications are standalone rows: delete explicitly.
-        notificationService.findByBookingId(id).forEach(n -> notificationRepository.deleteById(n.getId()));
+        notificationRepository.findByBookingId(id).forEach(n -> notificationRepository.deleteById(n.getId()));
         bookingRepository.delete(booking);
         return ResponseEntity.noContent().build();
     }
@@ -331,40 +327,34 @@ public class AdminDatabaseController {
         return ResponseEntity.noContent().build();
     }
 
-    // ---------------- email notifications ----------------
+    // ---------------- user notifications (in-app; inspect only) ----------------
 
-    @GetMapping("/email-notifications")
+    @GetMapping("/user-notifications")
     public ResponseEntity<?> listNotifications(
             @RequestHeader(value = "X-User-Role", required = false) String role,
-            @RequestParam(required = false) Long bookingId) {
+            @RequestParam(required = false) Long bookingId,
+            @RequestParam(required = false) Long userId) {
         requireAdmin(role);
+        List<UserNotification> rows = notificationRepository.findAll();
         if (bookingId != null) {
-            return ResponseEntity.ok(notificationService.findByBookingId(bookingId));
+            rows = rows.stream().filter(n -> bookingId.equals(n.getBookingId())).toList();
         }
-        return ResponseEntity.ok(notificationService.findAll());
+        if (userId != null) {
+            rows = rows.stream().filter(n -> userId.equals(n.getUserId())).toList();
+        }
+        return ResponseEntity.ok(rows);
     }
 
-    @PostMapping("/email-notifications/{id}/retry")
-    public ResponseEntity<?> retryNotification(
+    @DeleteMapping("/user-notifications/{id}")
+    public ResponseEntity<?> deleteNotification(
             @RequestHeader(value = "X-User-Role", required = false) String role,
             @PathVariable Long id) {
         requireAdmin(role);
-        try {
-            return ResponseEntity.ok(notificationService.retry(id));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        if (!notificationRepository.existsById(id)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found: " + id);
         }
-    }
-
-    @PostMapping("/email-notifications/{id}/cancel")
-    public ResponseEntity<?> cancelNotification(
-            @RequestHeader(value = "X-User-Role", required = false) String role,
-            @PathVariable Long id) {
-        requireAdmin(role);
-        EmailNotification n = notificationRepository.findById(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found: " + id));
-        n.setStatus(com.univ.equipment.model.EmailNotificationStatus.CANCELLED);
-        return ResponseEntity.ok(notificationRepository.save(n));
+        notificationRepository.deleteById(id);
+        return ResponseEntity.noContent().build();
     }
 
     // ---------------- helpers ----------------

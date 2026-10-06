@@ -60,31 +60,5 @@ export const adminApi = {
       method: 'DELETE', headers: adminHeaders()
     });
     return handle(res);
-  },
-
-  async retryNotification(id) {
-    const res = await fetch(`${ADMIN_BASE}/database/email-notifications/${id}/retry`, {
-      method: 'POST', headers: adminHeaders()
-    });
-    return handle(res);
-  },
-
-  async cancelNotification(id) {
-    const res = await fetch(`${ADMIN_BASE}/database/email-notifications/${id}/cancel`, {
-      method: 'POST', headers: adminHeaders()
-    });
-    return handle(res);
-  },
-
-  async sendTestEmail(recipient, subject) {
-    const res = await fetch(`${ADMIN_BASE}/email/test`, {
-      method: 'POST', headers: adminHeaders(), body: JSON.stringify({ recipient, subject })
-    });
-    return handle(res);
-  },
-
-  async getMailStatus() {
-    const res = await fetch(`${ADMIN_BASE}/email/status`, { headers: adminHeaders() });
-    return handle(res);
   }
 };

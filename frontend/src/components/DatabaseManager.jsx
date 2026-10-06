@@ -2,10 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { adminApi } from '../api/admin';
 import { DB_TABLES } from './dbTables.jsx';
 import DatabaseTableView from './DatabaseTableView';
-import EmailNotificationsView from './EmailNotificationsView';
-import { Database, Table2, Mail } from 'lucide-react';
+import { Database, Table2, BellRing } from 'lucide-react';
 
-const EMAIL_KEY = 'email-notifications';
+const NOTIFICATIONS_KEY = 'user-notifications';
 
 // Admin-only visual manager for the H2 data. Hidden from non-admins by the
 // sidebar and App guards; the backend additionally requires X-User-Role: ADMIN.
@@ -36,15 +35,6 @@ export default function DatabaseManager() {
     if (activeTable) loadSummary();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTable]);
-
-  if (activeTable === EMAIL_KEY) {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <button className="btn btn-secondary btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => setActiveTable(null)}>← All Tables</button>
-        <EmailNotificationsView />
-      </div>
-    );
-  }
 
   if (activeTable && DB_TABLES[activeTable]) {
     return (
@@ -91,7 +81,7 @@ export default function DatabaseManager() {
               style={{ padding: 20, textAlign: 'left', cursor: 'pointer', color: 'inherit', fontFamily: 'inherit' }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-                {t.key === EMAIL_KEY ? <Mail size={17} color="#e2b94a" /> : <Table2 size={17} color="#e2b94a" />}
+                {t.key === NOTIFICATIONS_KEY ? <BellRing size={17} color="#e2b94a" /> : <Table2 size={17} color="#e2b94a" />}
                 <span style={{ fontWeight: 800, fontSize: '0.95rem' }}>{t.label}</span>
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontFamily: 'monospace' }}>{t.table}</div>

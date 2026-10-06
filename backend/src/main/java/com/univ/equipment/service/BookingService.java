@@ -19,17 +19,14 @@ public class BookingService {
 
     private final BookingRequestRepository bookingRepository;
     private final EquipmentRepository equipmentRepository;
-    private final EmailNotificationService emailNotificationService;
-    private final N8nNotificationService n8nNotificationService;
+    private final NotificationService notificationService;
 
     public BookingService(BookingRequestRepository bookingRepository,
                           EquipmentRepository equipmentRepository,
-                          EmailNotificationService emailNotificationService,
-                          N8nNotificationService n8nNotificationService) {
+                          NotificationService notificationService) {
         this.bookingRepository = bookingRepository;
         this.equipmentRepository = equipmentRepository;
-        this.emailNotificationService = emailNotificationService;
-        this.n8nNotificationService = n8nNotificationService;
+        this.notificationService = notificationService;
     }
 
     public List<BookingRequest> getAllBookings() {
@@ -59,21 +56,9 @@ public class BookingService {
             request.setStatus(BookingStatus.PENDING_FACULTY);
         }
         BookingRequest saved = bookingRepository.save(request);
-        // Email must never break booking creation: the notification service
-        // runs in its own transaction and swallows its own failures.
-        try {
-            emailNotificationService.onBookingCreated(saved);
-        } catch (Exception e) {
-            log.error("Post-booking notification hook failed for booking {}: {}",
-                    saved.getId(), e.getMessage());
-        }
-        // n8n owns delivery when enabled; it never throws into this transaction.
-        try {
-            n8nNotificationService.sendBookingCreated(saved);
-        } catch (Exception e) {
-            log.error("n8n BOOKING_CREATED hook failed for booking {}: {}",
-                    saved.getId(), e.getMessage());
-        }
+        // Notifications must never break booking creation: the notification
+        // service runs in its own transaction and swallows its own failures.
+        notify(() -> notificationService.notifyBookingCreated(saved), saved.getId());
         return saved;
     }
 
@@ -89,19 +74,10 @@ public class BookingService {
             request.setStatus(BookingStatus.REJECTED);
         }
         BookingRequest saved = bookingRepository.save(request);
-        if (!endorse) {
-            try {
-                emailNotificationService.onBookingRejected(saved, notes);
-            } catch (Exception e) {
-                log.error("Rejection notification hook failed for booking {}: {}",
-                        saved.getId(), e.getMessage());
-            }
-            try {
-                n8nNotificationService.sendBookingRejected(saved, notes);
-            } catch (Exception e) {
-                log.error("n8n BOOKING_REJECTED hook failed for booking {}: {}",
-                        saved.getId(), e.getMessage());
-            }
+        if (endorse) {
+            notify(() -> notificationService.notifyFacultyApproved(saved), saved.getId());
+        } else {
+            notify(() -> notificationService.notifyBookingRejected(saved, notes), saved.getId());
         }
         return saved;
     }
@@ -118,25 +94,10 @@ public class BookingService {
             request.setStatus(BookingStatus.REJECTED);
         }
         BookingRequest saved = bookingRepository.save(request);
-        try {
-            if (approve) {
-                emailNotificationService.onBookingApproved(saved);
-            } else {
-                emailNotificationService.onBookingRejected(saved, notes);
-            }
-        } catch (Exception e) {
-            log.error("Approval notification hook failed for booking {}: {}",
-                    saved.getId(), e.getMessage());
-        }
-        try {
-            if (approve) {
-                n8nNotificationService.sendBookingApproved(saved);
-            } else {
-                n8nNotificationService.sendBookingRejected(saved, notes);
-            }
-        } catch (Exception e) {
-            log.error("n8n approval hook failed for booking {}: {}",
-                    saved.getId(), e.getMessage());
+        if (approve) {
+            notify(() -> notificationService.notifyBookingApproved(saved), saved.getId());
+        } else {
+            notify(() -> notificationService.notifyBookingRejected(saved, notes), saved.getId());
         }
         return saved;
     }
@@ -165,12 +126,7 @@ public class BookingService {
 
         request.setStatus(BookingStatus.ISSUED);
         BookingRequest saved = bookingRepository.save(request);
-        try {
-            emailNotificationService.onEquipmentIssued(saved);
-        } catch (Exception e) {
-            log.error("Issue notification hook failed for booking {}: {}",
-                    saved.getId(), e.getMessage());
-        }
+        notify(() -> notificationService.notifyEquipmentIssued(saved), saved.getId());
         return saved;
     }
 
@@ -198,18 +154,15 @@ public class BookingService {
 
         request.setStatus(BookingStatus.RETURNED);
         BookingRequest saved = bookingRepository.save(request);
-        try {
-            emailNotificationService.onEquipmentReturned(saved.getId());
-        } catch (Exception e) {
-            log.error("Return notification hook failed for booking {}: {}",
-                    saved.getId(), e.getMessage());
-        }
-        try {
-            n8nNotificationService.sendEquipmentReturned(saved);
-        } catch (Exception e) {
-            log.error("n8n EQUIPMENT_RETURNED hook failed for booking {}: {}",
-                    saved.getId(), e.getMessage());
-        }
+        notify(() -> notificationService.notifyEquipmentReturned(saved), saved.getId());
         return saved;
+    }
+
+    private void notify(Runnable action, Long bookingId) {
+        try {
+            action.run();
+        } catch (Exception e) {
+            log.error("Notification hook failed for booking {}: {}", bookingId, e.getMessage());
+        }
     }
 }

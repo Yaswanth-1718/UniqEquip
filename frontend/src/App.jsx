@@ -13,6 +13,7 @@ import AdminApprovalPortal from './components/AdminApprovalPortal';
 import AnalyticsReports from './components/AnalyticsReports';
 import BookingFormModal from './components/BookingFormModal';
 import DatabaseManager from './components/DatabaseManager';
+import NotificationsPage from './components/NotificationsPage';
 
 function MainAppContent() {
   const { currentUser } = useAuth();
@@ -120,6 +121,7 @@ function MainAppContent() {
         onOpenRecommendation={handleOpenRecommendation}
         isMobileMenuOpen={isMobileMenuOpen}
         setIsMobileMenuOpen={setIsMobileMenuOpen}
+        onNavigate={setActiveTab}
       />
 
       {/* Main Container */}
@@ -163,6 +165,13 @@ function MainAppContent() {
           {activeTab === 'tracker' && (
             <BookingStatusTracker
               bookings={bookings}
+            />
+          )}
+
+          {activeTab === 'notifications' && (
+            <NotificationsPage
+              userId={currentUser?.id}
+              onNavigate={setActiveTab}
             />
           )}
 
